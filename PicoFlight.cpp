@@ -2,6 +2,8 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "hardware/i2c.h"
+#include "hw_config.h"
+#include "ff.h"
 
 #define SPI_0_PORT spi0
 #define SPI_0_PIN_MISO 16
@@ -192,29 +194,56 @@ int main()
 
     while (1)
     {
-        flash_sector_erase(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page);
+        //flash_sector_erase(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page);
 
-        page = page + 128;
+        page = page + 1;
 
-        if (page > (128 * 16))
+        if (page > (128 * 8))
         {
             page = 0;
             break;
         }
     }
 
+    // setup sd card
+    FRESULT fr;
+    FATFS fs;
+    FIL fil;
+    int ret;
+    char buf[100];
+    char filename[] = "test04.txt";
+
+    if (!sd_init_driver())
+    {
+        puts("ERROR: Could not initialize SD card\r\n");
+        while (true)
+            ;
+    }
+
+    fr = f_mount(&fs, "0:", 1);
+    if (fr != FR_OK)
+    {
+        printf("ERROR: Could not mount filesystem (%d)\r\n", fr);
+        while (true)
+            ;
+    }
+
     // setup MPU6050
     mpu6050_reset();
     uint16_t acceleration[3], gyro[3], temp;
+
+    //setup clock
+    uint32_t bootTime;
 
     printf("START PROGRAM \n");
 
     while (1)
     {
+        bootTime = to_ms_since_boot(get_absolute_time());
+
         mpu6050_read_raw(acceleration, gyro, &temp);
 
-        printf("Acc. X = %d, Y = %d, Z = %d Gyro. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
-        //printf("Temp. = %f\n", (temp / 340.0) + 36.53);
+        //printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
 
         // set the correct vars for data log
         page_buf[0] = uint8_t(acceleration[0] >> 8);
@@ -234,13 +263,16 @@ int main()
         page_buf[12] = uint8_t(temp >> 8);
         page_buf[13] = uint8_t(temp & 0x00FF);
 
+        page_buf[14] = uint8_t(bootTime >> 8);
+        page_buf[15] = uint8_t(bootTime & 0x00FF);
+
         flash_page_program(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page, page_buf);
 
-        page = page + 128;
+        page = page + 1;
 
-        sleep_ms(100);
+        sleep_ms(50);
 
-        if (page > (128 * 16))
+        if (page > (128 * 8))
         {
             page = 0;
             break;
@@ -252,8 +284,28 @@ int main()
 
     printf("END READ\n");
 
+    // Open file for writing ()
+    fr = f_open(&fil, filename, FA_WRITE | FA_CREATE_ALWAYS);
+    if (fr != FR_OK)
+    {
+        printf("ERROR: Could not open file (%d)\r\n", fr);
+        while (true)
+            ;
+    }
+
+    // Write something to file
+    ret = f_printf(&fil, "page,boot,ax,ay,az,gx,gy,gz\n");
+    if (ret < 0)
+    {
+        printf("ERROR: Could not write to file (%d)\r\n", ret);
+        f_close(&fil);
+        while (true)
+            ;
+    }
+
     while (1)
     {
+
         flash_read(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page, page_buf, FLASH_PAGE_SIZE);
 
         acceleration[0] = (page_buf[0] << 8) | (page_buf[1] & 0x00FF);
@@ -266,19 +318,40 @@ int main()
 
         temp = (page_buf[12] << 8) | (page_buf[13] & 0xff);
 
-        printf("Acc. X = %d, Y = %d, Z = %d Gyro. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
-        //printf("Temp. = %f\n", (temp / 340.0) + 36.53);
+        bootTime = (page_buf[14] << 8) | (page_buf[15] & 0xff);
 
-        page = page + 128;
+        // Write something to file
+        ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d\n", page, bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
+        if (ret < 0)
+        {
+            printf("ERROR: Could not write to file (%d)\r\n", ret);
+            f_close(&fil);
+            while (true)
+                ;
+        }
 
-        sleep_ms(100);
+        page = page + 1;
 
-        if (page > (128 * 16))
+        //sleep_ms(100);
+
+        if (page > (128 * 8))
         {
             page = 0;
             break;
         }
     }
+
+    // Close file
+    fr = f_close(&fil);
+    if (fr != FR_OK)
+    {
+        printf("ERROR: Could not close file (%d)\r\n", fr);
+        while (true)
+            ;
+    }
+
+    // Unmount drive
+    f_unmount("0:");
 
     printf("END PROGRAM\n");
 }
