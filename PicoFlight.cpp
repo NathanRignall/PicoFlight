@@ -194,9 +194,9 @@ int main()
     {
         flash_sector_erase(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page);
 
-        page = page + 10;
+        page = page + 128;
 
-        if (page > (100))
+        if (page > (128 * 16))
         {
             page = 0;
             break;
@@ -213,8 +213,7 @@ int main()
     {
         mpu6050_read_raw(acceleration, gyro, &temp);
 
-        printf("Acc. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2]);
-        //printf("Gyro. X = %d, Y = %d, Z = %d\n", gyro[0], gyro[1], gyro[2]);
+        printf("Acc. X = %d, Y = %d, Z = %d Gyro. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
         //printf("Temp. = %f\n", (temp / 340.0) + 36.53);
 
         // set the correct vars for data log
@@ -225,25 +224,23 @@ int main()
         page_buf[4] = uint8_t(acceleration[2] >> 8);
         page_buf[5] = uint8_t(acceleration[2] & 0x00FF);
 
-        // page_buf[6] = uint8_t(gyro[0] >> 8);
-        // page_buf[7] = uint8_t(gyro[0] & 0x00FF);
-        // page_buf[8] = uint8_t(gyro[0] >> 8);
-        // page_buf[9] = uint8_t(gyro[0] & 0x00FF);
-        // page_buf[10] = uint8_t(gyro[0] >> 8);
-        // page_buf[11] = uint8_t(gyro[0] & 0x00FF);
+        page_buf[6] = uint8_t(gyro[0] >> 8);
+        page_buf[7] = uint8_t(gyro[0] & 0x00FF);
+        page_buf[8] = uint8_t(gyro[0] >> 8);
+        page_buf[9] = uint8_t(gyro[0] & 0x00FF);
+        page_buf[10] = uint8_t(gyro[0] >> 8);
+        page_buf[11] = uint8_t(gyro[0] & 0x00FF);
 
-        // page_buf[12] = uint8_t(temp >> 8);
-        // page_buf[13] = uint8_t(temp & 0x00FF);
+        page_buf[12] = uint8_t(temp >> 8);
+        page_buf[13] = uint8_t(temp & 0x00FF);
 
         flash_page_program(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page, page_buf);
 
-        page = page + 10;
+        page = page + 128;
 
-        //printf("log \n");
+        sleep_ms(100);
 
-        sleep_ms(1000);
-
-        if (page > (100))
+        if (page > (128 * 16))
         {
             page = 0;
             break;
@@ -263,23 +260,20 @@ int main()
         acceleration[1] = (page_buf[2] << 8) | (page_buf[3] & 0x00FF);
         acceleration[2] = (page_buf[4] << 8) | (page_buf[5] & 0x00FF);
 
-        //gyro[0] = (page_buf[6] << 8) | (page_buf[7] & 0xff);
-        //gyro[1] = (page_buf[8] << 8) | (page_buf[9] & 0xff);
-        //gyro[2] = (page_buf[10] << 8) | (page_buf[11] & 0xff);
+        gyro[0] = (page_buf[6] << 8) | (page_buf[7] & 0xff);
+        gyro[1] = (page_buf[8] << 8) | (page_buf[9] & 0xff);
+        gyro[2] = (page_buf[10] << 8) | (page_buf[11] & 0xff);
 
-        //temp = (page_buf[12] << 8) | (page_buf[13] & 0xff);
+        temp = (page_buf[12] << 8) | (page_buf[13] & 0xff);
 
-        printf("Acc. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2]);
-        //printf("Gyro. X = %d, Y = %d, Z = %d\n", gyro[0], gyro[1], gyro[2]);
+        printf("Acc. X = %d, Y = %d, Z = %d Gyro. X = %d, Y = %d, Z = %d\n", acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
         //printf("Temp. = %f\n", (temp / 340.0) + 36.53);
 
-        page = page + 10;
+        page = page + 128;
 
-        //printf("out \n");
+        sleep_ms(100);
 
-        sleep_ms(1000);
-
-        if (page > (100))
+        if (page > (128 * 16))
         {
             page = 0;
             break;
