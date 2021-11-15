@@ -1,16 +1,20 @@
 {
   "cmake.configureOnOpen": false,
   "cmake.statusbar.advanced": {
-    "debug" : {
+    "debug": {
       "visibility": "hidden"
-              },    "launch" : {
+    },
+    "launch": {
       "visibility": "hidden"
-               },
-    "build" : {
+    },
+    "build": {
       "visibility": "hidden"
-               },
-    "buildTarget" : {
+    },
+    "buildTarget": {
       "visibility": "hidden"
-               },
-     },
+    },
+  },
+  "files.associations": {
+    "spi.h": "c"
+  },
 }

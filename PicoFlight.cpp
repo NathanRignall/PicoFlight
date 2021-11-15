@@ -1,9 +1,15 @@
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "hardware/i2c.h"
-#include "hw_config.h"
+
 #include "ff.h"
+
+#include "hw_config.h"
+#include "flash_spi.h"
 
 #define SPI_0_PORT spi0
 #define SPI_0_PIN_MISO 16
@@ -75,94 +81,6 @@ static void mpu6050_read_raw(uint16_t accel[3], uint16_t gyro[3], uint16_t *temp
     *temp = buffer[0] << 8 | buffer[1];
 }
 
-static inline void cs_select(uint cs_pin)
-{
-    asm volatile("nop \n nop \n nop"); // FIXME
-    gpio_put(cs_pin, 0);
-    asm volatile("nop \n nop \n nop"); // FIXME
-}
-
-static inline void cs_deselect(uint cs_pin)
-{
-    asm volatile("nop \n nop \n nop"); // FIXME
-    gpio_put(cs_pin, 1);
-    asm volatile("nop \n nop \n nop"); // FIXME
-}
-
-void __not_in_flash_func(flash_read)(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint32_t page, uint8_t *buf, size_t len)
-{
-    cs_select(cs_pin);
-    uint8_t cmdbuf[4] = {
-        FLASH_CMD_READ,
-        (page >> 8) & 0xFF,
-        (page >> 0) & 0xFF,
-        addr};
-    spi_write_blocking(spi, cmdbuf, 4);
-    spi_read_blocking(spi, 0, buf, len);
-    cs_deselect(cs_pin);
-}
-
-void __not_in_flash_func(flash_write_enable)(spi_inst_t *spi, uint cs_pin)
-{
-    cs_select(cs_pin);
-    uint8_t cmd = FLASH_CMD_WRITE_EN;
-    spi_write_blocking(spi, &cmd, 1);
-    cs_deselect(cs_pin);
-}
-
-void __not_in_flash_func(flash_wait_done)(spi_inst_t *spi, uint cs_pin)
-{
-    uint8_t status;
-    do
-    {
-        cs_select(cs_pin);
-        uint8_t buf[2] = {FLASH_CMD_STATUS, 0};
-        spi_write_read_blocking(spi, buf, buf, 2);
-        cs_deselect(cs_pin);
-        status = buf[1];
-    } while (status & FLASH_STATUS_BUSY_MASK);
-}
-
-void __not_in_flash_func(flash_sector_erase)(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint32_t page)
-{
-    uint8_t cmdbuf[4] = {
-        FLASH_CMD_SECTOR_ERASE,
-        (page >> 8) & 0xFF,
-        (page >> 0) & 0xFF,
-        addr};
-    flash_write_enable(spi, cs_pin);
-    cs_select(cs_pin);
-    spi_write_blocking(spi, cmdbuf, 4);
-    cs_deselect(cs_pin);
-    flash_wait_done(spi, cs_pin);
-}
-
-void __not_in_flash_func(flash_page_program)(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint32_t page, uint8_t data[])
-{
-    uint8_t cmdbuf[4] = {
-        FLASH_CMD_PAGE_PROGRAM,
-        (page >> 8) & 0xFF,
-        (page >> 0) & 0xFF,
-        addr};
-    flash_write_enable(spi, cs_pin);
-    cs_select(cs_pin);
-    spi_write_blocking(spi, cmdbuf, 4);
-    spi_write_blocking(spi, data, FLASH_PAGE_SIZE);
-    cs_deselect(cs_pin);
-    flash_wait_done(spi, cs_pin);
-}
-
-void printbuf(uint8_t buf[FLASH_PAGE_SIZE])
-{
-    for (int i = 0; i < FLASH_PAGE_SIZE; ++i)
-    {
-        if (i % 16 == 15)
-            printf("%02x\n", buf[i]);
-        else
-            printf("%02x ", buf[i]);
-    }
-}
-
 int main()
 {
     stdio_init_all();
@@ -191,19 +109,6 @@ int main()
 
     uint32_t target_addr = 0;
     uint32_t page = 0;
-
-    while (1)
-    {
-        //flash_sector_erase(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page);
-
-        page = page + 1;
-
-        if (page > (128 * 8))
-        {
-            page = 0;
-            break;
-        }
-    }
 
     // setup sd card
     FRESULT fr;
@@ -235,6 +140,26 @@ int main()
     //setup clock
     uint32_t bootTime;
 
+    // init the flash chip
+    flash_spi *flash_spi_inst_0;
+    flash_spi_inst_0 = (flash_spi *)malloc(sizeof(flash_spi));
+
+    flash_spi_inst_0->hw_inst = SPI_0_PORT;
+    flash_spi_inst_0->cs_gpio = SPI_FLASH_PIN_CS;
+
+    while (1)
+    {
+        flash_spi_sector_erase(flash_spi_inst_0, target_addr, page);
+
+        page = page + 128;
+
+        if (page > (34816))
+        {
+            page = 0;
+            break;
+        }
+    }
+
     printf("START PROGRAM \n");
 
     while (1)
@@ -243,7 +168,7 @@ int main()
 
         mpu6050_read_raw(acceleration, gyro, &temp);
 
-        //printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
+        printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
 
         // set the correct vars for data log
         page_buf[0] = uint8_t(acceleration[0] >> 8);
@@ -255,24 +180,33 @@ int main()
 
         page_buf[6] = uint8_t(gyro[0] >> 8);
         page_buf[7] = uint8_t(gyro[0] & 0x00FF);
-        page_buf[8] = uint8_t(gyro[0] >> 8);
-        page_buf[9] = uint8_t(gyro[0] & 0x00FF);
-        page_buf[10] = uint8_t(gyro[0] >> 8);
-        page_buf[11] = uint8_t(gyro[0] & 0x00FF);
+        page_buf[8] = uint8_t(gyro[1] >> 8);
+        page_buf[9] = uint8_t(gyro[1] & 0x00FF);
+        page_buf[10] = uint8_t(gyro[2] >> 8);
+        page_buf[11] = uint8_t(gyro[2] & 0x00FF);
 
         page_buf[12] = uint8_t(temp >> 8);
         page_buf[13] = uint8_t(temp & 0x00FF);
 
-        page_buf[14] = uint8_t(bootTime >> 8);
-        page_buf[15] = uint8_t(bootTime & 0x00FF);
+        page_buf[20] = (bootTime >> 24) & 0xFF;
+        page_buf[21] = (bootTime >> 16) & 0xFF;
+        page_buf[22] = (bootTime >> 8) & 0xFF;
+        page_buf[23] = bootTime & 0xFF;
 
-        flash_page_program(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page, page_buf);
+        page_buf[200] = uint8_t(101);
+        page_buf[201] = uint8_t(102);
+        page_buf[202] = uint8_t(103);
+        page_buf[203] = uint8_t(103);
 
-        page = page + 1;
+        //page_buf[240] = uint8_t(page);
+
+        flash_spi_page_program(flash_spi_inst_0, target_addr, page, page_buf);
+
+        page = page + 128;
 
         sleep_ms(50);
 
-        if (page > (128 * 8))
+        if (page > (34816))
         {
             page = 0;
             break;
@@ -306,7 +240,7 @@ int main()
     while (1)
     {
 
-        flash_read(SPI_0_PORT, SPI_FLASH_PIN_CS, target_addr, page, page_buf, FLASH_PAGE_SIZE);
+        flash_spi_read(flash_spi_inst_0, target_addr, page, page_buf, FLASH_PAGE_SIZE);
 
         acceleration[0] = (page_buf[0] << 8) | (page_buf[1] & 0x00FF);
         acceleration[1] = (page_buf[2] << 8) | (page_buf[3] & 0x00FF);
@@ -318,9 +252,14 @@ int main()
 
         temp = (page_buf[12] << 8) | (page_buf[13] & 0xff);
 
-        bootTime = (page_buf[14] << 8) | (page_buf[15] & 0xff);
+        bootTime = page_buf[23];
+        bootTime = bootTime | (page_buf[22] << 8);
+        bootTime = bootTime | (page_buf[21] << 16);
+        bootTime = bootTime | (page_buf[20] << 24);
 
-        // Write something to file
+        printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
+
+        // Write page of flash to file
         ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d\n", page, bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
         if (ret < 0)
         {
@@ -330,11 +269,11 @@ int main()
                 ;
         }
 
-        page = page + 1;
+        page = page + 128;
 
-        //sleep_ms(100);
+        sleep_ms(100);
 
-        if (page > (128 * 8))
+        if (page > (34816))
         {
             page = 0;
             break;
