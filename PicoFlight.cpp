@@ -151,9 +151,9 @@ int main()
     {
         flash_spi_sector_erase(flash_spi_inst_0, target_addr, page);
 
-        page = page + 128;
+        page = page + 1;
 
-        if (page > (34816))
+        if (page > (128))
         {
             page = 0;
             break;
@@ -202,11 +202,11 @@ int main()
 
         flash_spi_page_program(flash_spi_inst_0, target_addr, page, page_buf);
 
-        page = page + 128;
+        page = page + 1;
 
         sleep_ms(50);
 
-        if (page > (34816))
+        if (page > (128))
         {
             page = 0;
             break;
@@ -269,11 +269,11 @@ int main()
                 ;
         }
 
-        page = page + 128;
+        page = page + 1;
 
         sleep_ms(100);
 
-        if (page > (34816))
+        if (page > (128))
         {
             page = 0;
             break;

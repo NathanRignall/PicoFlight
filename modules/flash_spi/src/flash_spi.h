@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include "hardware/spi.h"
+#include "pico/stdlib.h"
 
 #define FLASH_SPI_PAGE_SIZE 256
 
@@ -10,12 +12,11 @@
 #define FLASH_SPI_CMD_CHIP_ERASE 0xC7
 #define FLASH_SPI_CMD_SECTOR_ERASE 0x20
 
-typedef struct
+struct flash_spi
 {
     spi_inst_t *hw_inst;
     uint cs_gpio;
-
-} flash_spi;
+};
 
 void flash_spi_read(flash_spi *inst, uint32_t address, uint32_t page, uint8_t *buffer, size_t length);
 void flash_spi_chip_erase(flash_spi *inst);

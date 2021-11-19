@@ -15,6 +15,7 @@
     },
   },
   "files.associations": {
-    "spi.h": "c"
+    "spi.h": "c",
+    "flash_spi.h": "c"
   },
 }

@@ -1,8 +1,6 @@
 #include <stdio.h>
-
-#include "pico/stdlib.h"
 #include "hardware/spi.h"
-
+#include "pico/stdlib.h"
 #include "flash_spi.h"
 
 static inline void cs_select(uint cs_pin)
