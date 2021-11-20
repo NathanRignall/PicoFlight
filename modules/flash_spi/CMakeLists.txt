@@ -7,7 +7,7 @@ target_sources(flash_spi INTERFACE
 )
 
 target_include_directories(flash_spi INTERFACE
-        src
+        include
 )
 
 target_link_libraries(flash_spi INTERFACE

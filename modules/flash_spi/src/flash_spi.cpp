@@ -39,14 +39,20 @@ void wait_done(spi_inst_t *spi, uint cs_pin)
 }
 
 // public
-void flash_spi_read(flash_spi *inst, uint32_t address, uint32_t page, uint8_t *buffer, size_t length)
+void flash_spi_power_up(flash_spi *inst)
+{
+    uint8_t cmd = FLASH_SPI_CMD_RELEASE_POWER_DOWN;
+    spi_write_blocking(inst->hw_inst, &cmd, 1);
+}
+
+void flash_spi_read(flash_spi *inst, uint16_t page, uint8_t *buffer, size_t length)
 {
     cs_select(inst->cs_gpio);
     uint8_t cmdbuf[4] = {
         FLASH_SPI_CMD_READ,
-        (page >> 8) & 0xFF,
-        (page >> 0) & 0xFF,
-        address};
+        page >> 8 & 0x00FF,
+        uint8_t(page),
+        0};
 
     spi_write_blocking(inst->hw_inst, cmdbuf, 4);
     spi_read_blocking(inst->hw_inst, 0, buffer, length);
@@ -55,19 +61,25 @@ void flash_spi_read(flash_spi *inst, uint32_t address, uint32_t page, uint8_t *b
 
 void flash_spi_chip_erase(flash_spi *inst)
 {
+    uint8_t cmdbuf[1] = {
+        FLASH_SPI_CMD_CHIP_ERASE};
+
+    write_enable(inst->hw_inst, inst->cs_gpio);
+
     cs_select(inst->cs_gpio);
-    uint8_t cmd = FLASH_SPI_CMD_CHIP_ERASE;
-    spi_write_blocking(inst->hw_inst, &cmd, 1);
-    cs_select(inst->cs_gpio);
+    spi_write_blocking(inst->hw_inst, cmdbuf, 1);
+    cs_deselect(inst->cs_gpio);
+
+    wait_done(inst->hw_inst, inst->cs_gpio);
 }
 
-void flash_spi_sector_erase(flash_spi *inst, uint32_t address, uint32_t page)
+void flash_spi_sector_erase(flash_spi *inst, uint16_t page)
 {
     uint8_t cmdbuf[4] = {
         FLASH_SPI_CMD_SECTOR_ERASE,
-        (page >> 8) & 0xFF,
-        (page >> 0) & 0xFF,
-        address};
+        page >> 8 & 0x00FF,
+        uint8_t(page),
+        0};
 
     write_enable(inst->hw_inst, inst->cs_gpio);
 
@@ -78,13 +90,13 @@ void flash_spi_sector_erase(flash_spi *inst, uint32_t address, uint32_t page)
     wait_done(inst->hw_inst, inst->cs_gpio);
 }
 
-void flash_spi_page_program(flash_spi *inst, uint32_t addr, uint32_t page, uint8_t data[])
+void flash_spi_page_program(flash_spi *inst, uint16_t page, uint8_t data[])
 {
     uint8_t cmdbuf[4] = {
         FLASH_SPI_CMD_PAGE_PROGRAM,
-        (page >> 8) & 0xFF,
-        (page >> 0) & 0xFF,
-        addr};
+        page >> 8 & 0x00FF,
+        uint8_t(page),
+        0};
 
     write_enable(inst->hw_inst, inst->cs_gpio);
 

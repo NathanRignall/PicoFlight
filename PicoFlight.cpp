@@ -96,7 +96,7 @@ int main()
     gpio_set_dir(SPI_FLASH_PIN_CS, GPIO_OUT);
     gpio_put(SPI_FLASH_PIN_CS, 1);
 
-    // I2C Initialisation. Using it at 400Khz.
+    // /I2C Initialisation. Using it at 400Khz.
     i2c_init(I2C_0_PORT, 400 * 1000);
 
     gpio_set_function(I2C_0_PIN_SDA, GPIO_FUNC_I2C);
@@ -107,8 +107,7 @@ int main()
     // setup spi flash
     uint8_t page_buf[FLASH_PAGE_SIZE] = {0};
 
-    uint32_t target_addr = 0;
-    uint32_t page = 0;
+    uint16_t page = 0;
 
     // setup sd card
     FRESULT fr;
@@ -116,7 +115,7 @@ int main()
     FIL fil;
     int ret;
     char buf[100];
-    char filename[] = "test04.txt";
+    char filename[] = "test15.txt";
 
     if (!sd_init_driver())
     {
@@ -147,18 +146,29 @@ int main()
     flash_spi_inst_0->hw_inst = SPI_0_PORT;
     flash_spi_inst_0->cs_gpio = SPI_FLASH_PIN_CS;
 
-    while (1)
-    {
-        flash_spi_sector_erase(flash_spi_inst_0, target_addr, page);
+    // turn on
+    flash_spi_power_up(flash_spi_inst_0);
 
-        page = page + 1;
+    sleep_ms(100);
+    flash_spi_chip_erase(flash_spi_inst_0);
+    sleep_ms(100);
 
-        if (page > (128))
-        {
-            page = 0;
-            break;
-        }
-    }
+    // while (1)
+    // {
+    //     flash_spi_sector_erase(flash_spi_inst_0, page);
+
+    //     page = page + 1;
+
+    //     //sleep_ms(5);
+
+    //     if (page > (16384))
+    //     {
+    //         page = 0;
+    //         break;
+    //     }
+    // }
+
+    //flash_spi_chip_erase(flash_spi_inst_0);
 
     printf("START PROGRAM \n");
 
@@ -168,7 +178,7 @@ int main()
 
         mpu6050_read_raw(acceleration, gyro, &temp);
 
-        printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
+        //printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
 
         // set the correct vars for data log
         page_buf[0] = uint8_t(acceleration[0] >> 8);
@@ -193,20 +203,20 @@ int main()
         page_buf[22] = (bootTime >> 8) & 0xFF;
         page_buf[23] = bootTime & 0xFF;
 
-        page_buf[200] = uint8_t(101);
-        page_buf[201] = uint8_t(102);
-        page_buf[202] = uint8_t(103);
-        page_buf[203] = uint8_t(103);
+        // page_buf[200] = uint8_t(101);
+        // page_buf[201] = uint8_t(102);
+        // page_buf[202] = uint8_t(103);
+        // page_buf[203] = uint8_t(103);
 
-        //page_buf[240] = uint8_t(page);
+        page_buf[240] = uint8_t(page);
 
-        flash_spi_page_program(flash_spi_inst_0, target_addr, page, page_buf);
+        flash_spi_page_program(flash_spi_inst_0, page, page_buf);
 
         page = page + 1;
 
-        sleep_ms(50);
+        //sleep_ms(5);
 
-        if (page > (128))
+        if (page > (16384))
         {
             page = 0;
             break;
@@ -228,7 +238,7 @@ int main()
     }
 
     // Write something to file
-    ret = f_printf(&fil, "page,boot,ax,ay,az,gx,gy,gz\n");
+    ret = f_printf(&fil, "page,a,b,c,d,boot,ax,ay,az,gx,gy,gz\n");
     if (ret < 0)
     {
         printf("ERROR: Could not write to file (%d)\r\n", ret);
@@ -240,7 +250,7 @@ int main()
     while (1)
     {
 
-        flash_spi_read(flash_spi_inst_0, target_addr, page, page_buf, FLASH_PAGE_SIZE);
+        flash_spi_read(flash_spi_inst_0, page, page_buf, FLASH_PAGE_SIZE);
 
         acceleration[0] = (page_buf[0] << 8) | (page_buf[1] & 0x00FF);
         acceleration[1] = (page_buf[2] << 8) | (page_buf[3] & 0x00FF);
@@ -257,10 +267,10 @@ int main()
         bootTime = bootTime | (page_buf[21] << 16);
         bootTime = bootTime | (page_buf[20] << 24);
 
-        printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
+        //printf("%d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
 
         // Write page of flash to file
-        ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d\n", page, bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
+        ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", page, page_buf[20], page_buf[21], page_buf[22], page_buf[23], bootTime, acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
         if (ret < 0)
         {
             printf("ERROR: Could not write to file (%d)\r\n", ret);
@@ -271,9 +281,9 @@ int main()
 
         page = page + 1;
 
-        sleep_ms(100);
+        //sleep_ms(5);
 
-        if (page > (128))
+        if (page > (16384))
         {
             page = 0;
             break;
