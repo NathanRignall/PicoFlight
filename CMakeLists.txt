@@ -24,6 +24,7 @@ add_executable(PicoFlight PicoFlight.cpp hw_config.c)
 # Add any other source code
 add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
 add_subdirectory(modules/flash_spi)
+add_subdirectory(modules/mpu6050)
 
 pico_set_program_name(PicoFlight "PicoFlight")
 pico_set_program_version(PicoFlight "0.1")
@@ -40,6 +41,7 @@ target_link_libraries(PicoFlight
         hardware_i2c
         FatFs_SPI
         flash_spi
+        mpu6050
         )
 
 pico_add_extra_outputs(PicoFlight)
