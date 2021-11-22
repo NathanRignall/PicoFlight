@@ -19,10 +19,11 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(PicoFlight PicoFlight.cpp hw_config.c)
+add_executable(PicoFlight PicoFlight.cpp)
 
 # Add any other source code
 add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
+add_subdirectory(modules/flight_data)
 add_subdirectory(modules/flash_spi)
 add_subdirectory(modules/mpu6050)
 
@@ -41,6 +42,7 @@ target_link_libraries(PicoFlight
         hardware_i2c
         FatFs_SPI
         flash_spi
+        flight_data
         mpu6050
         )
 

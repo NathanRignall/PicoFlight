@@ -2,7 +2,12 @@
 #include "hardware/spi.h"
 #include "pico/stdlib.h"
 
+#ifndef FLIGHT_DATA_H_
+#define FLIGHT_DATA_H_
+
 #define FLASH_SPI_PAGE_SIZE 256
+//#define FLASH_SPI_PAGES 16383
+#define FLASH_SPI_PAGES 100
 
 #define FLASH_SPI_STATUS_BUSY_MASK 0x01
 #define FLASH_SPI_CMD_PAGE_PROGRAM 0x02
@@ -17,6 +22,8 @@ struct flash_spi
 {
     spi_inst_t *hw_inst;
     uint cs_gpio;
+    uint16_t page;
+    uint8_t page_buf[FLASH_SPI_PAGE_SIZE];
 };
 
 void flash_spi_power_up(flash_spi *inst);
@@ -25,3 +32,5 @@ void flash_spi_chip_erase(flash_spi *inst);
 void flash_spi_sector_erase(flash_spi *inst, uint16_t page);
 void flash_spi_page_program(flash_spi *inst, uint16_t page, uint8_t data[]);
 void printbuf(uint8_t buf[FLASH_SPI_PAGE_SIZE]);
+
+#endif
