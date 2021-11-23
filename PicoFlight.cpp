@@ -29,6 +29,8 @@ int main()
 {
     stdio_init_all();
 
+    printf("[INFO] BEGIN PROGRAM \n");
+
     // SPI initialisation. This example will use SPI at 1MHz.
     spi_init(SPI_0_PORT, 1000 * 1000);
     gpio_set_function(SPI_0_PIN_MISO, GPIO_FUNC_SPI);
@@ -67,24 +69,33 @@ int main()
     mpu6050_inst_0->addr = 0x68;
     mpu6050_reset(mpu6050_inst_0);
 
-    printf("START PROGRAM \n");
+    printf("[INFO] START MAIN PROGRAM \n");
 
-    int i;
+    int i = 0;
 
     // main program loop
-    while (i < 10)
+    while (i < 1000)
     {
+        // read data
         flight.data->system_clock_now = to_ms_since_boot(get_absolute_time());
-
         mpu6050_read_data(mpu6050_inst_0, flight.data->acceleration, flight.data->gyroscope, &flight.data->temperature);
 
+        // save the data
         flight.save_to_flash();
 
-        printf("YO %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", flight.data->system_clock_now, flight.data->acceleration[0], flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
+        // print flight data for debugging
+        printf("LIVE   Time. N = %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", flight.data->system_clock_now, flight.data->acceleration[0], flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
 
+        // artificial delay
+        sleep_ms(20);
         i++;
-        sleep_ms(300);
     }
 
-    //flight.save_all_to_sd();
+    printf("[INFO] END MAIN PROGRAM \n");
+
+    // backup flash data
+    flight.save_all_to_sd();
+    flight.unmount_sd();
+
+    printf("[INFO] DONE PROGRAM \n");
 }

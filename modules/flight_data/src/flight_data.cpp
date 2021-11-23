@@ -17,14 +17,15 @@ flight_data_system::flight_data_system(flash_spi *flash_spi_inst)
     flash_spi_local_inst->page = 0;
     flash_spi_read(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf, FLASH_SPI_PAGE_SIZE);
 
-    if (flash_spi_local_inst->page_buf[0] == 1)
+    printf("[INFO] SAVE STATUS %d \n", flash_spi_local_inst->page_buf[0]);
+    if (flash_spi_local_inst->page_buf[0] != 2)
     {
-        //save_all_to_sd();
+        printf("[INFO] NEED TO WRITE \n");
+        save_all_to_sd();
     }
-    else
-    {
-        reset_flash();
-    }
+
+    // always reset the flash to begin writing
+    reset_flash();
 }
 
 void flight_data_system::save_to_flash()
@@ -32,15 +33,11 @@ void flight_data_system::save_to_flash()
     // check if hit max flash on current chip
     if (flash_spi_local_inst->page >= FLASH_SPI_PAGES)
     {
-        flash_spi_local_inst->page = FLASH_SPI_PAGES;
-        flash_spi_local_inst->page_buf[255] = true;
-
-        flash_spi_page_program(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf);
-
-        printf("[ERROR] Run out of flash! \n");
+        printf("[ERROR] RUN OUT OF FLASH! \n");
     }
     else
     {
+        // put flight data into buffer
         flash_spi_local_inst->page_buf[0] = (data->system_clock_now >> 24) & 0xFF;
         flash_spi_local_inst->page_buf[1] = (data->system_clock_now >> 16) & 0xFF;
         flash_spi_local_inst->page_buf[2] = (data->system_clock_now >> 8) & 0xFF;
@@ -63,8 +60,9 @@ void flight_data_system::save_to_flash()
         flash_spi_local_inst->page_buf[16] = uint8_t(data->temperature >> 8);
         flash_spi_local_inst->page_buf[17] = uint8_t(data->temperature & 0x00FF);
 
-        flash_spi_local_inst->page_buf[255] = false;
+        flash_spi_local_inst->page_buf[255] = uint8_t(flash_spi_local_inst->page);
 
+        // write buffer to a page of flash
         flash_spi_page_program(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf);
 
         flash_spi_local_inst->page++;
@@ -91,18 +89,19 @@ void flight_data_system::init_sd()
     }
 
     has_sd_init = true;
-    printf("[DONE] INIT SD");
+    printf("[DONE] INIT SD \n");
 }
 
 void flight_data_system::save_all_to_sd()
 {
+    // only init sd if need to
     if (has_sd_init == false)
     {
         init_sd();
     }
 
     // Open file for writing
-    fr = f_open(&fil, "test.csv", FA_WRITE | FA_CREATE_ALWAYS);
+    fr = f_open(&fil, "main.csv", FA_WRITE | FA_CREATE_ALWAYS);
     if (fr != FR_OK)
     {
         printf("ERROR: Could not open file (%d)\r\n", fr);
@@ -124,8 +123,17 @@ void flight_data_system::save_all_to_sd()
 
     while (flash_spi_local_inst->page <= FLASH_SPI_PAGES)
     {
+        // read a page of flash
         flash_spi_read(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf, FLASH_SPI_PAGE_SIZE);
 
+        // check if filled with our data packet
+        if (flash_spi_local_inst->page_buf[255] != uint8_t(flash_spi_local_inst->page))
+        {
+            printf("[INFO] FINISHED SD AT - %d - %d \n", flash_spi_local_inst->page_buf[255], flash_spi_local_inst->page);
+            break;
+        }
+
+        // take data out of flash buffer and put it back into flight data
         data->system_clock_now = flash_spi_local_inst->page_buf[3];
         data->system_clock_now = data->system_clock_now | (flash_spi_local_inst->page_buf[2] << 8);
         data->system_clock_now = data->system_clock_now | (flash_spi_local_inst->page_buf[1] << 16);
@@ -141,34 +149,55 @@ void flight_data_system::save_all_to_sd()
 
         data->temperature = (flash_spi_local_inst->page_buf[16] << 8) | (flash_spi_local_inst->page_buf[17] & 0xff);
 
-        printf("NO  %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", data->system_clock_now, data->acceleration[0], data->acceleration[1], data->acceleration[2],
-               data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
-
+        // save flight data to sd
         ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", flash_spi_local_inst->page, data->system_clock_now, data->acceleration[0], data->acceleration[1], data->acceleration[2],
                        data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
 
-        if (flash_spi_local_inst->page_buf[255] == true)
-        {
-            break;
-        }
+        // print flight data for debuging
+        printf("SAVE   Time. N = %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", data->system_clock_now, data->acceleration[0], data->acceleration[1], data->acceleration[2],
+               data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
 
         flash_spi_local_inst->page++;
     }
 
-    printf("[DONE] SAVING TO SD");
+    // Close file
+    fr = f_close(&fil);
+    if (fr != FR_OK)
+    {
+        printf("ERROR: Could not close file (%d)\r\n", fr);
+        while (true)
+            ;
+    }
 
-    reset_flash();
+    // once saved to sd set flash page 1 to false
+    flash_spi_local_inst->page = 0;
+    flash_spi_sector_erase(flash_spi_local_inst, flash_spi_local_inst->page);
+    flash_spi_local_inst->page_buf[0] = 2;
+    flash_spi_page_program(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf);
+
+    printf("[DONE] SAVING TO SD + FLASH MARK \n");
 }
 
 void flight_data_system::reset_flash()
 {
+    // erase the whole chip
     flash_spi_chip_erase(flash_spi_local_inst);
+
+    // write the first packet
+    flash_spi_local_inst->page = 0;
     flash_spi_local_inst->page_buf[0] = 1;
-    flash_spi_local_inst->page_buf[1] = 123;
     flash_spi_page_program(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf);
 
     // increase flash to starting point
     flash_spi_local_inst->page = 1;
 
-    printf("[INFO] RESET FLASH");
+    printf("[INFO] RESET FLASH \n");
+}
+
+void flight_data_system::unmount_sd()
+{
+    f_unmount("0:");
+    has_sd_init = false;
+
+    printf("[INFO] UNMOUNT SD \n");
 }

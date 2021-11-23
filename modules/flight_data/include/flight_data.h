@@ -21,6 +21,7 @@ public:
     void save_to_flash();
     void save_all_to_sd();
     void init_sd();
+    void unmount_sd();
 
 private:
     void reset_flash();
