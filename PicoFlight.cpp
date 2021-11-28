@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
@@ -22,8 +23,6 @@
 #define I2C_0_PORT i2c1
 #define I2C_0_PIN_SDA 14
 #define I2C_0_PIN_SCL 15
-
-#define RUN_TOTAL 100
 
 int main()
 {
@@ -69,26 +68,38 @@ int main()
     mpu6050_inst_0->addr = 0x68;
     mpu6050_reset(mpu6050_inst_0);
 
-    printf("[INFO] START MAIN PROGRAM \n");
+    printf("[INFO] START MAIN PROGRAM..... \n");
 
     int i = 0;
 
     // main program loop
     while (i < 1000)
     {
-        // read data
-        flight.data->system_clock_now = to_ms_since_boot(get_absolute_time());
+        // get current time
+        flight.data->system_clock_now = time_us_64();
+
+        // read data from sensors
         mpu6050_read_data(mpu6050_inst_0, flight.data->acceleration, flight.data->gyroscope, &flight.data->temperature);
+
+        // print flight data for debugging
+        //printf("LIVE   Time. N = %d  Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)flight.data->system_clock_now, flight.data->acceleration[0],
+        //flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
 
         // save the data
         flight.save_to_flash();
 
-        // print flight data for debugging
-        printf("LIVE   Time. N = %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", flight.data->system_clock_now, flight.data->acceleration[0], flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
-
-        // artificial delay
-        sleep_ms(20);
+        // increase temp loop
         i++;
+
+        // get current time
+        flight.data->system_clock_end = to_us_since_boot(get_absolute_time());
+        flight.data->system_clock_dt = flight.data->system_clock_end - flight.data->system_clock_now;
+
+        // sleep if needed
+        if (flight.data->system_clock_dt < 20000)
+        {
+            sleep_us(20000 - flight.data->system_clock_dt);
+        }
     }
 
     printf("[INFO] END MAIN PROGRAM \n");
