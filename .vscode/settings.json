@@ -14,8 +14,7 @@
       "visibility": "hidden"
     },
   },
-  "files.associations": {
-    "spi.h": "c",
-    "flash_spi.h": "c"
+  "cmake.environment": {
+    "PICO_SDK_PATH":"../../pico-sdk"
   },
 }
