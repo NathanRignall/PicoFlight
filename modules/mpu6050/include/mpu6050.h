@@ -9,4 +9,4 @@ struct mpu6050
 };
 
 void mpu6050_reset(mpu6050 *inst);
-void mpu6050_read_data(mpu6050 *inst, uint32_t accel[3], uint32_t gyro[3], uint32_t *temp);
+void mpu6050_read_data(mpu6050 *inst, long double accel[3], long double  gyro[3], float *temp);

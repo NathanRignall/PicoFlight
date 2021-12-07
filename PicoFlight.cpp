@@ -6,12 +6,17 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "hardware/i2c.h"
+#include "hardware/uart.h"
 
 #include "ff.h"
 
 #include "flight_data.h"
 #include "flash_spi.h"
 #include "mpu6050.h"
+
+#define UART0_ID uart0
+#define UART0_TX_GP 0
+#define UART0_RX_GP 1
 
 #define UART1_ID uart1
 #define UART1_TX_GP 4
@@ -80,12 +85,14 @@ int main()
     mpu6050_reset(mpu6050_inst_0);
 
     printf("[INFO] START MAIN PROGRAM..... \n");
-    uart_puts(UART1_ID, "UART1 with debug\n");
 
+    uart_puts(UART1_ID, "START TELEM!\n\r");   
+
+    printf("test urart %i", uart_is_enabled(UART1_ID));
     int i = 0;
 
     // main program loop
-    while (i < 10000)
+    while (i < 16000)
     {
         // get current time
         flight.data->system_clock_now = time_us_64();
@@ -94,13 +101,13 @@ int main()
         mpu6050_read_data(mpu6050_inst_0, flight.data->acceleration, flight.data->gyroscope, &flight.data->temperature);
 
         // print flight data for debugging
-        printf("[LIVE]   Time. N = %d  Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)flight.data->system_clock_now, flight.data->acceleration[0],
+        printf("[LIVE]   Time. N = %d  Acc. X = %f, Y = %f, Z = %f   Gyro. X = %f, Y = %f, Z = %f\n", (int)flight.data->system_clock_now, flight.data->acceleration[0],
                 flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
 
         // save the data
         flight.save_to_flash();
 
-        uart_puts(UART1_ID, "UART1 with debug\n");
+        uart_puts(UART1_ID, "HELLOOO\n\r");   
 
         // increase temp loop
         i++;

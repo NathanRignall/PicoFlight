@@ -7,9 +7,9 @@ struct flight_data
     uint64_t system_clock_now;
     uint64_t system_clock_end;
     uint64_t system_clock_dt;
-    uint32_t acceleration[3];
-    uint32_t gyroscope[3];
-    uint32_t temperature;
+    long double acceleration[3];
+    long double gyroscope[3];
+    float temperature;
 };
 
 class flight_data_system

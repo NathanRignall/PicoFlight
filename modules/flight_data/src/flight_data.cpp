@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "flash_spi.h"
 
@@ -9,9 +10,12 @@
 
 flight_data_system::flight_data_system(flash_spi *flash_spi_inst)
 {
-    data = (flight_data *)malloc(sizeof(flight_data));
+    // setup system vars
     has_sd_init = false;
     flash_spi_local_inst = flash_spi_inst;
+
+    // setup flight data vars
+    data = (flight_data *)malloc(sizeof(flight_data));
 
     // if flash not backed up back it up!
     flash_spi_local_inst->page = 0;
@@ -36,30 +40,11 @@ void flight_data_system::save_to_flash()
         printf("[ERROR] RUN OUT OF FLASH! \n");
     }
     else
-    {
-        // put flight data into buffer
-        flash_spi_local_inst->page_buf[0] = (data->system_clock_now >> 24) & 0xFF;
-        flash_spi_local_inst->page_buf[1] = (data->system_clock_now >> 16) & 0xFF;
-        flash_spi_local_inst->page_buf[2] = (data->system_clock_now >> 8) & 0xFF;
-        flash_spi_local_inst->page_buf[3] = data->system_clock_now & 0xFF;
+    {  
+        // copy flight data save to array buffer
+        memcpy (flash_spi_local_inst->page_buf, data, sizeof(flight_data));
 
-        flash_spi_local_inst->page_buf[4] = uint8_t(data->acceleration[0] >> 8);
-        flash_spi_local_inst->page_buf[5] = uint8_t(data->acceleration[0] & 0x00FF);
-        flash_spi_local_inst->page_buf[6] = uint8_t(data->acceleration[0] >> 8);
-        flash_spi_local_inst->page_buf[7] = uint8_t(data->acceleration[0] & 0x00FF);
-        flash_spi_local_inst->page_buf[8] = uint8_t(data->acceleration[0] >> 8);
-        flash_spi_local_inst->page_buf[9] = uint8_t(data->acceleration[0] & 0x00FF);
-
-        flash_spi_local_inst->page_buf[10] = uint8_t(data->gyroscope[0] >> 8);
-        flash_spi_local_inst->page_buf[11] = uint8_t(data->gyroscope[0] & 0x00FF);
-        flash_spi_local_inst->page_buf[12] = uint8_t(data->gyroscope[1] >> 8);
-        flash_spi_local_inst->page_buf[13] = uint8_t(data->gyroscope[1] & 0x00FF);
-        flash_spi_local_inst->page_buf[14] = uint8_t(data->gyroscope[2] >> 8);
-        flash_spi_local_inst->page_buf[15] = uint8_t(data->gyroscope[2] & 0x00FF);
-
-        flash_spi_local_inst->page_buf[16] = uint8_t(data->temperature >> 8);
-        flash_spi_local_inst->page_buf[17] = uint8_t(data->temperature & 0x00FF);
-
+        // set incramental save byte
         flash_spi_local_inst->page_buf[255] = uint8_t(flash_spi_local_inst->page);
 
         // write buffer to a page of flash
@@ -110,7 +95,7 @@ void flight_data_system::save_all_to_sd()
     }
 
     // Write something to file
-    ret = f_printf(&fil, "page,a,b,c,d,boot,ax,ay,az,gx,gy,gz\n");
+    ret = f_printf(&fil, "page,boot,ax,ay,az,gx,gy,gz\n");
     if (ret < 0)
     {
         printf("ERROR: Could not write to file (%d)\r\n", ret);
@@ -126,35 +111,22 @@ void flight_data_system::save_all_to_sd()
         // read a page of flash
         flash_spi_read(flash_spi_local_inst, flash_spi_local_inst->page, flash_spi_local_inst->page_buf, FLASH_SPI_PAGE_SIZE);
 
-        // check if filled with our data packet
+        // check incramental save byte
         if (flash_spi_local_inst->page_buf[255] != uint8_t(flash_spi_local_inst->page))
         {
             printf("[INFO] FINISHED SD AT - %d - %d \n", flash_spi_local_inst->page_buf[255], flash_spi_local_inst->page);
             break;
         }
 
-        // take data out of flash buffer and put it back into flight data
-        data->system_clock_now = flash_spi_local_inst->page_buf[3];
-        data->system_clock_now = data->system_clock_now | (flash_spi_local_inst->page_buf[2] << 8);
-        data->system_clock_now = data->system_clock_now | (flash_spi_local_inst->page_buf[1] << 16);
-        data->system_clock_now = data->system_clock_now | (flash_spi_local_inst->page_buf[0] << 24);
-
-        data->acceleration[0] = (flash_spi_local_inst->page_buf[4] << 8) | (flash_spi_local_inst->page_buf[5] & 0x00FF);
-        data->acceleration[1] = (flash_spi_local_inst->page_buf[6] << 8) | (flash_spi_local_inst->page_buf[7] & 0x00FF);
-        data->acceleration[2] = (flash_spi_local_inst->page_buf[8] << 8) | (flash_spi_local_inst->page_buf[9] & 0x00FF);
-
-        data->gyroscope[0] = (flash_spi_local_inst->page_buf[10] << 8) | (flash_spi_local_inst->page_buf[11] & 0xff);
-        data->gyroscope[1] = (flash_spi_local_inst->page_buf[12] << 8) | (flash_spi_local_inst->page_buf[13] & 0xff);
-        data->gyroscope[2] = (flash_spi_local_inst->page_buf[14] << 8) | (flash_spi_local_inst->page_buf[15] & 0xff);
-
-        data->temperature = (flash_spi_local_inst->page_buf[16] << 8) | (flash_spi_local_inst->page_buf[17] & 0xff);
+        // copy buffer to flight data save
+        memcpy (data, flash_spi_local_inst->page_buf, sizeof(flight_data));
 
         // print flight data for debuging
-        //printf("SAVE   Time. N = %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],
-               //data->acceleration[2], data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
+        printf("SAVE   Time. N = %d   Acc. X = %f, Y = %f, Z = %f   Gyro. X = %f, Y = %f, Z = %f\n", (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],
+               data->acceleration[2], data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
 
         // save flight data to sd
-        ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", flash_spi_local_inst->page, (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],
+        ret = f_printf(&fil, "%d,%d,%f,%f,%f,%f,%f,%f \n", flash_spi_local_inst->page, (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],
                        data->acceleration[2], data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
 
         flash_spi_local_inst->page++;

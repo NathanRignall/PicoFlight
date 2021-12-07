@@ -7,7 +7,7 @@ void mpu6050_reset(mpu6050 *inst)
     i2c_write_blocking(inst->hw_inst, inst->addr, buf, 2, false);
 }
 
-void mpu6050_read_data(mpu6050 *inst, uint32_t accel[3], uint32_t gyro[3], uint32_t *temp)
+void mpu6050_read_data(mpu6050 *inst, long double accel[3], long double gyro[3], float *temp)
 {
     // For this particular device, we send the device the register we want to read
     // first, then subsequently read from the device. The register is auto incrementing
@@ -22,7 +22,7 @@ void mpu6050_read_data(mpu6050 *inst, uint32_t accel[3], uint32_t gyro[3], uint3
 
     for (int i = 0; i < 3; i++)
     {
-        accel[i] = (buffer[i * 2] << 8 | buffer[(i * 2) + 1]);
+        accel[i] = (buffer[i * 2] << 8 | buffer[(i * 2) + 1]) / 32768;
     }
 
     // Now gyro data from reg 0x43 for 6 bytes
@@ -33,7 +33,7 @@ void mpu6050_read_data(mpu6050 *inst, uint32_t accel[3], uint32_t gyro[3], uint3
 
     for (int i = 0; i < 3; i++)
     {
-        gyro[i] = (buffer[i * 2] << 8 | buffer[(i * 2) + 1]);
+        gyro[i] = (buffer[i * 2] << 8 | buffer[(i * 2) + 1]) / 131;
         ;
     }
 
