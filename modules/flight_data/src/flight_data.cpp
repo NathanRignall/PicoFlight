@@ -150,8 +150,8 @@ void flight_data_system::save_all_to_sd()
         data->temperature = (flash_spi_local_inst->page_buf[16] << 8) | (flash_spi_local_inst->page_buf[17] & 0xff);
 
         // print flight data for debuging
-        printf("SAVE   Time. N = %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],
-               data->acceleration[2], data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
+        //printf("SAVE   Time. N = %d   Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],
+               //data->acceleration[2], data->gyroscope[0], data->gyroscope[1], data->gyroscope[2]);
 
         // save flight data to sd
         ret = f_printf(&fil, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", flash_spi_local_inst->page, (int)data->system_clock_now, data->acceleration[0], data->acceleration[1],

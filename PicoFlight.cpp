@@ -13,6 +13,10 @@
 #include "flash_spi.h"
 #include "mpu6050.h"
 
+#define UART1_ID uart1
+#define UART1_TX_GP 4
+#define UART1_RX_GP 5
+
 #define SPI_0_PORT spi0
 #define SPI_0_PIN_MISO 16
 #define SPI_0_PIN_SCK 18
@@ -30,8 +34,15 @@ int main()
 
     printf("[INFO] BEGIN PROGRAM \n");
 
+    // UART 1 initialisation. 
+    uart_init(UART1_ID, 115200);
+
+    gpio_set_function(UART1_TX_GP, GPIO_FUNC_UART);
+    gpio_set_function(UART1_RX_GP, GPIO_FUNC_UART);
+
     // SPI initialisation. This example will use SPI at 1MHz.
     spi_init(SPI_0_PORT, 1000 * 1000);
+
     gpio_set_function(SPI_0_PIN_MISO, GPIO_FUNC_SPI);
     gpio_set_function(SPI_0_PIN_SCK, GPIO_FUNC_SPI);
     gpio_set_function(SPI_0_PIN_MOSI, GPIO_FUNC_SPI);
@@ -69,11 +80,12 @@ int main()
     mpu6050_reset(mpu6050_inst_0);
 
     printf("[INFO] START MAIN PROGRAM..... \n");
+    uart_puts(UART1_ID, "UART1 with debug\n");
 
     int i = 0;
 
     // main program loop
-    while (i < 1000)
+    while (i < 10000)
     {
         // get current time
         flight.data->system_clock_now = time_us_64();
@@ -82,11 +94,13 @@ int main()
         mpu6050_read_data(mpu6050_inst_0, flight.data->acceleration, flight.data->gyroscope, &flight.data->temperature);
 
         // print flight data for debugging
-        //printf("LIVE   Time. N = %d  Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)flight.data->system_clock_now, flight.data->acceleration[0],
-        //flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
+        printf("[LIVE]   Time. N = %d  Acc. X = %d, Y = %d, Z = %d   Gyro. X = %d, Y = %d, Z = %d\n", (int)flight.data->system_clock_now, flight.data->acceleration[0],
+                flight.data->acceleration[1], flight.data->acceleration[2], flight.data->gyroscope[0], flight.data->gyroscope[1], flight.data->gyroscope[2]);
 
         // save the data
         flight.save_to_flash();
+
+        uart_puts(UART1_ID, "UART1 with debug\n");
 
         // increase temp loop
         i++;
